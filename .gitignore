@@ -1,0 +1,24 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+frontend/dist/
+meetq/static/
+data/
+tests/fixtures/*.wav
+*.sqlite3
+.playwright/
+
+# local-only: docs, deploy config, tool settings (never published)
+docs/
+deploy/
+poetry.toml
+CLAUDE.md
+AGENTS.md
+.claude/
+.vscode/
+.idea/

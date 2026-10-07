@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Only the checks that need neither an OpenAI API key nor real audio devices:
+#   ruff, tsc, frontend build, T1 (unit, OpenAI mocked) and the corrections UI test
+#   (Playwright against a seeded local DB). T2-T4 / T6 and the other T5 test call the
+#   real API or play audio through the speakers, so they stay local (scripts\verify.ps1).
+jobs:
+  test:
+    # PyAudioWPatch (WASAPI loopback) and the SAPI audio fixture are Windows-only
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONIOENCODING: utf-8
+      POETRY_VIRTUALENVS_IN_PROJECT: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Poetry
+        run: python -m pip install "poetry==2.4.2"
+
+      - name: Install Python dependencies
+        run: poetry install --no-interaction
+
+      - name: Lint (ruff)
+        run: poetry run ruff check .
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck (tsc)
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build frontend (meetq/static)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Generate audio fixture (Windows SAPI; falls back to any installed voice)
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make_fixture.ps1
+
+      - name: Install Playwright Chromium
+        run: poetry run playwright install chromium
+
+      - name: Unit tests (T1)
+        run: poetry run pytest -m t1 -q
+
+      - name: Corrections UI test (T5, no API)
+        run: poetry run pytest tests/test_t5_corrections_ui.py -q
